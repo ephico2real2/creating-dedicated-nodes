@@ -13,13 +13,31 @@
 #
 set -euo pipefail
 
-SA_NAME="argocd-deployer"
-# Discovery: the same label setup-tenant-namespaces.sh stamps on each tenant NS.
-# TENANT_SELECTOR is passed straight to `oc get ns -l`.
-TENANT_SELECTOR="node-role.kubernetes.io/iiot=true"
-ARGOCD_NS="argocd"
-OUT_DIR="./argocd-clusters"
+SA_NAME="${SA_NAME:-argocd-deployer}"
+# Discovery label stamped on each tenant NS by setup-tenant-namespaces.sh.
+# Passed straight to `oc get ns -l`. Override with env or --selector.
+TENANT_SELECTOR="${TENANT_SELECTOR:-node-role.kubernetes.io/iiot=true}"
+# Argo CD namespace the generated cluster Secrets target.
+# Override with env (ARGOCD_NS=...) or the -n/--argocd-ns flag.
+ARGOCD_NS="${ARGOCD_NS:-argocd}"
+OUT_DIR="${OUT_DIR:-./argocd-clusters}"
+
+# ---- CLI overrides ----
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -n|--argocd-ns) ARGOCD_NS="$2"; shift 2 ;;
+    -s|--selector)  TENANT_SELECTOR="$2"; shift 2 ;;
+    -o|--out-dir)   OUT_DIR="$2"; shift 2 ;;
+    -h|--help)
+      echo "usage: $0 [-n|--argocd-ns <ns>] [-s|--selector <label>] [-o|--out-dir <dir>]"
+      echo "  env overrides also work: ARGOCD_NS, TENANT_SELECTOR, OUT_DIR, SA_NAME"
+      exit 0 ;;
+    *) echo "unknown arg: $1 (see --help)"; exit 1 ;;
+  esac
+done
+
 mkdir -p "$OUT_DIR"
+echo ">> argocd namespace: ${ARGOCD_NS}"
 
 b64d() { openssl base64 -d -A; }   # portable base64 decode (Linux + macOS)
 
